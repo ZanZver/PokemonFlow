@@ -2,3 +2,6 @@
 docker/docker/logs/
 docker/docker/plugins/
 docker/dags/__pycache__/
+.DS_Store
+*.pyc
+*.log
