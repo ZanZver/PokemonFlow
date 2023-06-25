@@ -8,9 +8,11 @@ from airflow import settings
 from airflow.models import Connection
 import logging
 
+import pandas as pd
 import json, pandas
 from pandas import json_normalize
 from datetime import datetime
+import psycopg2
   
 def _create_conn():
     session = settings.Session() # get the session
@@ -40,6 +42,35 @@ def _store_pokemon():
         sql="COPY PokeData FROM stdin WITH DELIMITER as ','",
         filename='/Data/Pokemon.csv'
     )
+    
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+
+def _remove_duplicates():
+    # Connect to the PostgreSQL database
+    postgres_hook = PostgresHook(postgres_conn_id='pokemon_db')
+    connection = postgres_hook.get_conn()
+    
+    # Read data from the PokeData table
+    query = "SELECT * FROM PokeData"
+    df = pd.read_sql(query, connection)
+    
+    # Remove duplicates using Pandas
+    df.drop_duplicates(inplace=True)
+    
+    # Write the cleaned data back to the PokeData table
+    df.to_sql('PokeData', connection, if_exists='replace', index=False)
+    
+    
+def _drop_duplicates():
+    # Create a PostgresHook using the predefined connection
+    hook = PostgresHook(postgres_conn_id='pokemon_db')
+    
+    # Execute the SQL query to drop duplicates
+    query = "DELETE FROM PokeData WHERE ctid NOT IN (SELECT min(ctid) FROM PokeData GROUP BY id);"
+    hook.run(query)
+
+
+
 
 with DAG('pokemon_processing', start_date=datetime(2022, 1, 1), 
         schedule_interval='@daily', catchup=False) as dag:
@@ -76,4 +107,9 @@ with DAG('pokemon_processing', start_date=datetime(2022, 1, 1),
         python_callable=_store_pokemon
     )
     
-    create_conn >> create_table >> store_pokemon
+    remove_duplicates = PythonOperator(
+        task_id='remove_duplicates',
+        python_callable=_drop_duplicates
+    )
+    
+    create_conn >> create_table >> store_pokemon >> remove_duplicates
