@@ -63,9 +63,10 @@ x-airflow-common:
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
   volumes:
-    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
-    - ${AIRFLOW_PROJ_DIR:-.}/docker/logs:/opt/airflow/logs
-    - ${AIRFLOW_PROJ_DIR:-.}/docker/plugins:/opt/airflow/plugins
+    - ${AIRFLOW_PROJ_DIR:-.}/../DAGs:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/../Data:/Data
+    - ${AIRFLOW_PROJ_DIR:-.}/../Docker/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-.}/../Docker/plugins:/opt/airflow/plugins
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -84,11 +85,19 @@ services:
       POSTGRES_DB: airflow
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
+    ports:
+      - 9000:5432
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
       retries: 5
     restart: always
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 9090:8080
 
   redis:
     image: redis:latest
@@ -229,9 +238,9 @@ services:
           echo "   https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html#before-you-begin"
           echo
         fi
-        mkdir -p /sources/docker/logs /sources/dags /sources/docker/plugins
-        chown -R "${AIRFLOW_UID}:0" /sources/docker/{logs,plugins}
-        chown -R "${AIRFLOW_UID}:0" /sources/dags
+        mkdir -p /sources/../Docker/logs /sources/../DAGs /sources/../Docker/plugins /sources/../Data
+        chown -R "${AIRFLOW_UID}:0" /sources/../Docker/{logs,plugins}
+        chown -R "${AIRFLOW_UID}:0" /sources/../{DAGs,Data}
         exec /entrypoint airflow version
     # yamllint enable rule:line-length
     environment:
